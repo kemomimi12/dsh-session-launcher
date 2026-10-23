@@ -1,0 +1,4 @@
+- insert:
+    - id: session-launcher
+      name: '@local/session-launcher'
+      config: {}

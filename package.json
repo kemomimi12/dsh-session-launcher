@@ -1,0 +1,31 @@
+{
+  "name": "@local/session-launcher",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Create a new Harness session and seed it with an opening prompt, so a long task can continue in a fresh context window.",
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "cordis",
+    "plugin",
+    "session"
+  ],
+  "license": "MIT",
+  "exports": {
+    ".": "./index.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

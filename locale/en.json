@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Session Launcher",
+    "description": "Create a new Harness session and seed it with an opening prompt, so a long task can continue in a fresh context window."
+  }
+}
