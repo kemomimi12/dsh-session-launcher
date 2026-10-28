@@ -45,6 +45,7 @@ plugin_manager(action: "install_bundle", target: "<本仓库绝对路径>")
 | `cwd` | 否 | 新会话的工作目录。**省略则自动继承当前会话的目录** |
 | `title` | 否 | 会话标题，创建后设置 |
 | `inheritWorkspace` | 否 | 是否挂到调用方的工作区分组，默认 `true` |
+| `agentPreset` | 否 | 新会话的 agent preset。**省略则继承调用方的 preset**；传 `""` 表示强制用部署默认 |
 
 返回值：
 
@@ -54,6 +55,7 @@ plugin_manager(action: "install_bundle", target: "<本仓库绝对路径>")
   "prompted": true,
   "cwd": "D:\\Work\\be-log-platform",
   "workspace": "be-log-platform",
+  "preset": "cordis",
   "inherited": true
 }
 ```
@@ -62,6 +64,8 @@ plugin_manager(action: "install_bundle", target: "<本仓库绝对路径>")
 | --- | --- |
 | `inherited` | `true` 表示目录是从调用方会话继承的，`false` 表示显式传入或用了插件默认值 |
 | `workspace` | 新会话挂上的工作区分组名，未分组时省略 |
+| `preset` | 新会话用的 agent preset，未绑定时省略 |
+| `promptError` | 开场提示词发送失败时的原因；此时 `prompted=false`，但 `sessionId` **仍然有效** |
 
 ### 工作区继承的优先级
 
@@ -96,8 +100,9 @@ new_session(prompt: "...", cwd: "D:\\Obsidian\\Xfufu")
 | `cwd` | 兜底工作目录（既没传参、也继承不到时使用） |
 | `defaultPrompt` | 未传 `prompt` 时使用的开场提示词 |
 | `inheritWorkspace` | 全局关闭工作区继承（默认 `true`） |
+| `inheritPreset` | 全局关闭 agent preset 继承（默认 `true`）。**不建议关**，见「限制 5」的姊妹条目 |
 
-## ⚠️ 四个必须知道的限制
+## ⚠️ 五个必须知道的限制
 
 ### 1. 新会话立刻开始运行，你没法先审
 
@@ -144,17 +149,46 @@ if (workspaceId) request.workspaceId = workspaceId
 else if (cwd) request.cwd = cwd
 ```
 
+### 5. prompt 失败时不抛错，而是把错误带回给调用方
+
+`v1.2.0` 改的。理由：会话**已经建好**了。如果抛错，调用方拿不到 `sessionId`，只能重新调用一次 `new_session`——结果多出一个空会话，用户要去手动删。
+
+现在的行为：
+
+```json
+{ "sessionId": "session-...", "prompted": false, "promptError": "stream closed" }
+```
+
+渲染出来的提示会明确说「会话已保留，可切过去手动补一句开场白——不要重新调用本工具」。
+
+## 版本变更
+
+| 版本 | 改了什么 | 为什么 |
+| --- | --- | --- |
+| `1.2.0` | ① 新增 `agentPreset` 参数，默认**继承调用方的 preset** ② prompt 失败不再抛错，改为返回 `promptError` ③ 新增 `test.mjs`（12 个用例） | ① preset 决定工具集和技能目录，交接时丢了 preset 表现为「新窗口做不了刚才能做的事」且**不报错** ② 抛错会让调用方重试，产生多余空会话 |
+| `1.1.0` | 包名改为 `dsh-session-launcher`；新增工作区继承 | 与仓库名对齐；避免新会话散落在「未分组」 |
+| `1.0.0` | 首版 | — |
+
+## 测试
+
+```bash
+node test.mjs     # 12 个用例，用假的 Host Service，不启动 Harness
+```
+
+覆盖：目录继承、工作区解析、preset 继承与覆盖、`inheritWorkspace: false`、prompt 失败降级、`defaultPrompt` 兜底、`title` 不影响 create 请求。
+
 ## 工作原理
 
 ```
-new_session(prompt, cwd, title, inheritWorkspace)
+new_session(prompt, cwd, title, inheritWorkspace, agentPreset)
   │
   ├─ workingDirectory.ensure(agent)          → 继承调用方目录（可选服务）
   ├─ workspaceRegistry.create(cwd)           → 解析/创建工作区（幂等）
+  ├─ agentPresets.composedPreset(agent.ctx)  → 继承调用方 preset（可选服务）
   │
-  ├─ sessionController.create({ workspaceId } | { cwd })
+  ├─ sessionController.create({ workspaceId } | { cwd }, agentPreset?)
   ├─ sessionController.rename({ sessionId, title })        （可选，失败不阻断）
-  └─ sessionController.prompt({ ... }, detachedSignal())   → 新会话开始运行
+  └─ sessionController.prompt({ ... }, detachedSignal())   → 新会话开始运行（失败降级为 promptError）
 ```
 
 依赖的 Host Service：
@@ -165,6 +199,7 @@ new_session(prompt, cwd, title, inheritWorkspace)
 | `sessionController` | **必需** | `create` / `rename` / `prompt` |
 | `workingDirectory` | 可选 | `ensure(agent)` 读取调用方目录 |
 | `workspaceRegistry` | 可选 | `create(path)` 解析工作区 |
+| `agentPresets` | 可选 | `composedPreset(ctx)` 继承 preset |
 
 > **可选服务怎么声明**：`export const inject` **只能写数组**（只放硬依赖）。可选服务用 `ctx.get('name')` 拿，拿不到就降级。
 >
