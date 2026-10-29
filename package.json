@@ -1,6 +1,6 @@
 {
   "name": "dsh-session-launcher",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "private": true,
   "type": "module",
   "description": "Create a new Harness session that inherits the caller's workspace, agent preset, and working directory, and seed it with an opening prompt, so a long task can continue in a fresh context window.",

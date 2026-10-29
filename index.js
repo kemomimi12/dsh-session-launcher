@@ -195,15 +195,18 @@ export function apply(ctx, config = {}) {
 
         const presetOut = created?.agentPreset || preset || undefined
 
-        return {
-          sessionId,
-          prompted,
-          cwd: cwd || undefined,
-          workspace: workspaceTitle,
-          preset: presetOut,
-          inherited,
-          promptError,
-        }
+        // 返回值必须是「无损 JSON」——绝不能带 undefined 值的键。
+        // 之前直接写 { cwd: cwd || undefined, workspace: workspaceTitle, preset: presetOut, promptError }，
+        // 当某个字段为空时对象里会出现 `key: undefined`，Harness 做无损 JSON 校验时
+        // 直接报 "value is not lossless JSON"，整个工具调用失败（会话其实已经建好，
+        // 但调用方拿不到 sessionId，还会误以为没建，重复调用又多出空会话）。
+        // 改为「有值才放进对象」，保证返回的是纯 JSON。
+        const result = { sessionId, prompted, inherited }
+        if (cwd) result.cwd = cwd
+        if (workspaceTitle) result.workspace = workspaceTitle
+        if (presetOut) result.preset = presetOut
+        if (promptError) result.promptError = promptError
+        return result
       },
     }),
   )

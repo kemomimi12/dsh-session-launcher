@@ -159,5 +159,50 @@ await test('prompt 用 detached signal：不是工具调用的 signal', async ()
   assert.ok(calls.prompt.length === 1)
 })
 
+// ---------------------------------------------------------------------------
+// 健壮性 / 无损 JSON（回归：v1.2.0 曾把 {cwd: undefined} 之类带 undefined 的值返回，
+// Harness 无损 JSON 校验直接报 "value is not lossless JSON"，整个工具调用失败）
+// ---------------------------------------------------------------------------
+
+await test('返回值不含 undefined：无 cwd/workspace/preset/promptError 时是纯 JSON', async () => {
+  const { tool } = makeCtx({})
+  const out = await tool.execute({}, undefined)
+  // 无损 JSON：任何值为 undefined 的键都不允许存在
+  for (const [k, v] of Object.entries(out)) {
+    assert.notEqual(v, undefined, `键 ${k} 的值不应为 undefined`)
+  }
+  assert.deepEqual(Object.keys(out).sort(), ['inherited', 'prompted', 'sessionId'])
+  // 往返一致（JSON.stringify 会丢 undefined，若相等说明本来就没有 undefined）
+  assert.deepEqual(JSON.parse(JSON.stringify(out)), out)
+})
+
+await test('返回值不含 undefined：显式 cwd + prompt 失败 组合', async () => {
+  const { tool } = makeCtx({ promptThrows: 'stream closed' })
+  const out = await tool.execute({ cwd: 'D:\\Other', prompt: 'hi' }, undefined)
+  for (const [, v] of Object.entries(out)) assert.notEqual(v, undefined)
+  assert.equal(out.cwd, 'D:\\Other')
+  assert.equal(out.prompted, false)
+  assert.equal(out.promptError, 'stream closed')
+  // preset 为空时不应出现该键
+  assert.equal('preset' in out, false)
+})
+
+await test('健壮性：title + prompt + 继承 各种组合都不抛，且返回纯 JSON', async () => {
+  const combos = [
+    {},
+    { title: 't' },
+    { prompt: 'p' },
+    { title: 't', prompt: 'p', inheritWorkspace: false },
+    { agentPreset: '' },
+    { agentPreset: 'standard', prompt: 'p' },
+  ]
+  for (const args of combos) {
+    const { tool } = makeCtx({ caller: { cwd: 'D:\\Work\\repo' }, promptThrows: args.prompt ? undefined : undefined })
+    const out = await tool.execute(args, { agent: { id: 's', ctx: {} } })
+    for (const [, v] of Object.entries(out)) assert.notEqual(v, undefined)
+    assert.deepEqual(JSON.parse(JSON.stringify(out)), out)
+  }
+})
+
 console.log(`\n${passed} passed, ${failed} failed`)
 process.exit(failed ? 1 : 0)

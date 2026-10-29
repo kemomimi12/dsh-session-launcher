@@ -165,6 +165,7 @@ else if (cwd) request.cwd = cwd
 
 | 版本 | 改了什么 | 为什么 |
 | --- | --- | --- |
+| `1.2.1` | ① 修复返回对象含 `undefined` 值导致 Harness 报 `value is not lossless JSON`、整个 `new_session` 调用失败的问题（改为「有值才放键」，保证纯 JSON）② `test.mjs` 增补 3 个无损 JSON/健壮性回归用例（共 15 个） | 之前 `{ cwd: cwd||undefined, preset, promptError }` 在字段为空时会带 `key: undefined`；Harness 的无损 JSON 校验直接拒绝，工具报错——但会话其实已经建好，调用方拿不到 `sessionId` 会更迷惑、甚至重复建空会话 |
 | `1.2.0` | ① 新增 `agentPreset` 参数，默认**继承调用方的 preset** ② prompt 失败不再抛错，改为返回 `promptError` ③ 新增 `test.mjs`（12 个用例） | ① preset 决定工具集和技能目录，交接时丢了 preset 表现为「新窗口做不了刚才能做的事」且**不报错** ② 抛错会让调用方重试，产生多余空会话 |
 | `1.1.0` | 包名改为 `dsh-session-launcher`；新增工作区继承 | 与仓库名对齐；避免新会话散落在「未分组」 |
 | `1.0.0` | 首版 | — |
@@ -172,7 +173,7 @@ else if (cwd) request.cwd = cwd
 ## 测试
 
 ```bash
-node test.mjs     # 12 个用例，用假的 Host Service，不启动 Harness
+node test.mjs     # 15 个用例，用假的 Host Service，不启动 Harness
 ```
 
 覆盖：目录继承、工作区解析、preset 继承与覆盖、`inheritWorkspace: false`、prompt 失败降级、`defaultPrompt` 兜底、`title` 不影响 create 请求。
